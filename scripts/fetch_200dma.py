@@ -9,7 +9,9 @@ import requests
 
 METRIC = "200wma-heatmap"
 URL = f"https://api.bitcoinmagazinepro.com/metrics/{METRIC}"
-OUT_PATH = "docs/data/price-200dma.json"
+
+# Output that GitHub Pages will serve
+OUT_PATH = "docs/data/200dma.json"
 
 
 def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
@@ -24,16 +26,15 @@ def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
 def coerce_to_csv_text(raw: str) -> str:
     s = raw.strip()
 
-    # Sometimes response is a JSON-escaped string containing CSV
+    # Sometimes the API returns a JSON-encoded string containing CSV
     if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
         try:
             s = json.loads(s)
         except Exception:
             s = s[1:-1]
 
+    # Sometimes CSV starts with a leading comma
     s = s.lstrip()
-
-    # Remove leading empty header artifacts
     if s.startswith(","):
         s = s[1:]
     if s.startswith('",'):
@@ -71,29 +72,16 @@ def main() -> None:
 
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
     out["price"] = pd.to_numeric(out["price"], errors="coerce")
-
     out = out.dropna(subset=["date", "price"]).sort_values("date")
 
-    # Compute 200 day simple moving average from price
-    out["ma200d"] = out["price"].rolling(window=200, min_periods=200).mean()
-
-    out = out.dropna(subset=["ma200d"])
+    # Compute 200-day moving average from daily price
+    out["dma200"] = out["price"].rolling(window=200, min_periods=200).mean()
+    out = out.dropna(subset=["dma200"])
 
     rows = [
-        {
-            "date": d.strftime("%Y-%m-%d"),
-            "price": float(p),
-            "ma200d": float(m),
-        }
-        for d, p, m in zip(out["date"], out["price"], out["ma200d"])
+        {"date": d.strftime("%Y-%m-%d"), "price": float(p), "dma200": float(m)}
+        for d, p, m in zip(out["date"], out["price"], out["dma200"])
     ]
 
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(rows, f)
-
-    print(f"Wrote {OUT_PATH} rows={len(rows)}")
-
-
-if __name__ == "__main__":
-    main()
+    with ope
