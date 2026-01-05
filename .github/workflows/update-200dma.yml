@@ -3,7 +3,7 @@ name: Update 200DMA JSON
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 3 * * *" # daily 03:15 UTC
+    - cron: "15 3 * * *"
 
 permissions:
   contents: write
@@ -25,7 +25,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests
 
-      - name: Fetch data
+      - name: Fetch 200DMA data
         env:
           BMP_API_KEY: ${{ secrets.BMP_API_KEY }}
         run: |
@@ -35,10 +35,6 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git add docs/data/price-200dma.json
-          if git diff --cached --quiet; then
-            echo "No changes"
-            exit 0
-          fi
-          git commit -m "Update 200DMA data"
+          git add docs/data/200dma.json
+          git commit -m "Update 200DMA data" || echo "No changes to commit"
           git push
