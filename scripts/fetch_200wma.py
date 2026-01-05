@@ -1,4 +1,4 @@
-# scripts/fetch_200wma.py
+# scripts/fetch_200dma.py
 import io
 import json
 import os
@@ -6,9 +6,10 @@ import os
 import pandas as pd
 import requests
 
+
 METRIC = "200wma-heatmap"
 URL = f"https://api.bitcoinmagazinepro.com/metrics/{METRIC}"
-OUT_PATH = "docs/data/200wma.json"
+OUT_PATH = "docs/data/price-200dma.json"
 
 
 def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
@@ -23,7 +24,7 @@ def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
 def coerce_to_csv_text(raw: str) -> str:
     s = raw.strip()
 
-    # If response is a JSON string that contains CSV, unescape it
+    # Sometimes response is a JSON-escaped string containing CSV
     if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
         try:
             s = json.loads(s)
@@ -31,6 +32,8 @@ def coerce_to_csv_text(raw: str) -> str:
             s = s[1:-1]
 
     s = s.lstrip()
+
+    # Remove leading empty header artifacts
     if s.startswith(","):
         s = s[1:]
     if s.startswith('",'):
@@ -68,21 +71,20 @@ def main() -> None:
 
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
     out["price"] = pd.to_numeric(out["price"], errors="coerce")
+
     out = out.dropna(subset=["date", "price"]).sort_values("date")
 
-    # If there are multiple rows per day, keep the last one
-    out["day"] = out["date"].dt.strftime("%Y-%m-%d")
-    out = out.groupby("day", as_index=False).agg(date=("date", "max"), price=("price", "last"))
-    out = out.sort_values("date")
-
-    # 200-day simple moving average on the available daily series
+    # Compute 200 day simple moving average from price
     out["ma200d"] = out["price"].rolling(window=200, min_periods=200).mean()
 
-    # Keep only rows where the 200d MA exists (after 200 data points)
     out = out.dropna(subset=["ma200d"])
 
     rows = [
-        {"date": d.strftime("%Y-%m-%d"), "price": float(p), "ma200d": float(m)}
+        {
+            "date": d.strftime("%Y-%m-%d"),
+            "price": float(p),
+            "ma200d": float(m),
+        }
         for d, p, m in zip(out["date"], out["price"], out["ma200d"])
     ]
 
