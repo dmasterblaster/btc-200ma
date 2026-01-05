@@ -1,101 +1,52 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BTC Price + 200 Day Moving Average</title>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      #chart { width: 100%; height: 78vh; }
+      .err { color: #b00020; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="chart"></div>
+    <div id="err" class="err"></div>
 
-  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+    <script>
+      const errEl = document.getElementById("err");
 
-  <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
-    }
-    #chart {
-      width: 100vw;
-      height: 100vh;
-    }
-  </style>
-</head>
-<body>
+      async function loadData() {
+        const url = "./data/price-200dma.json";
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url}`);
+        return r.json();
+      }
 
-<div id="chart"></div>
+      function render(data) {
+        const dates = data.map(d => d.date);
+        const price = data.map(d => d.price);
+        const ma200d = data.map(d => d.ma200d);
 
-<script>
-async function loadChart() {
-  try {
-    const response = await fetch("data/200wma.json", { cache: "no-store" });
-    const data = await response.json();
+        const priceTrace = {
+          x: dates,
+          y: price,
+          type: "scatter",
+          mode: "lines",
+          name: "BTC Price",
+        };
 
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error("No valid data loaded");
-    }
+        const maTrace = {
+          x: dates,
+          y: ma200d,
+          type: "scatter",
+          mode: "lines",
+          name: "200 Day MA",
+        };
 
-    const dates = data.map(d => d.date);
-    const price = data.map(d => d.price);
-    const ma200w = data.map(d => d.ma200w);
-
-    const priceTrace = {
-      name: "BTC Price",
-      x: dates,
-      y: price,
-      type: "scatter",
-      mode: "lines",
-      line: { width: 2 },
-      hovertemplate: "$%{y:,.0f}<br>%{x}<extra></extra>"
-    };
-
-    const maTrace = {
-      name: "200 Week Moving Average",
-      x: dates,
-      y: ma200w,
-      type: "scatter",
-      mode: "lines",
-      line: { width: 2 },
-      hovertemplate: "$%{y:,.0f}<br>%{x}<extra></extra>"
-    };
-
-    const layout = {
-      xaxis: {
-        title: "Date",
-        showgrid: false,
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" }
-      },
-      yaxis: {
-        title: "USD",
-        type: "log",
-        tickprefix: "$",
-        tickformat: ",",
-        showgrid: true,
-        gridcolor: "#e6e6e6",
-        tickfont: { color: "#111111" },
-        titlefont: { color: "#111111" }
-      },
-      legend: {
-        orientation: "h",
-        x: 0,
-        y: 1.05
-      },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
-      margin: { l: 80, r: 30, t: 30, b: 60 }
-    };
-
-    Plotly.newPlot("chart", [priceTrace, maTrace], layout, {
-      responsive: true,
-      displaylogo: false
-    });
-
-  } catch (err) {
-    document.getElementById("chart").innerHTML =
-      "<p style='color:red;padding:20px;'>Error loading chart data</p>";
-    console.error(err);
-  }
-}
-
-loadChart();
-</script>
-
-</body>
-</html>
+        const layout = {
+          margin: { l: 60, r: 30, t: 20, b: 50 },
+          xaxis: { title: "Date" },
+          yaxis: { title: "USD"
