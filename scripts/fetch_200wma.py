@@ -1,107 +1,75 @@
 import io
 import json
 import os
-from datetime import datetime, timezone
 
 import pandas as pd
 import requests
 
 
 METRIC = "200wma-heatmap"
-URL = f"https://api.bitcoinmagazinepro.com/metrics/{METRIC}"  # no /v1 per BM Pro docs
-OUT_PATH = "docs/data/200wma.json"
+URL = f"https://api.bitcoinmagazinepro.com/metrics/{METRIC}"
+OUT_PATH = "docs/data/200wma.json"  # change if your Pages root is different
 
 
 def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
-    cols_lower = {c.lower(): c for c in df.columns}
-    for name in candidates:
-        if name.lower() in cols_lower:
-            return cols_lower[name.lower()]
-    raise KeyError(f"Could not find any of these columns: {candidates}. Found: {list(df.columns)}")
+    # case-insensitive column picker
+    cols_map = {str(c).strip().lower(): c for c in df.columns}
+    for cand in candidates:
+        key = cand.strip().lower()
+        if key in cols_map:
+            return cols_map[key]
+    raise KeyError(f"Missing column. Tried {candidates}. Found {list(df.columns)}")
 
 
 def main() -> None:
     api_key = os.environ.get("BMP_API_KEY")
     if not api_key:
-        raise RuntimeError("Missing env var BMP_API_KEY")
+        raise RuntimeError("Missing BMP_API_KEY env var")
 
     headers = {
-        "Authorization": f"Bearer {api_key}",  # docs recommend header auth
-        "Accept": "text/csv,application/json;q=0.9,*/*;q=0.8",
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "text/csv",
     }
 
     resp = requests.get(URL, headers=headers, timeout=45)
     print("BMP API status code:", resp.status_code)
-    print("Content-Type:", resp.headers.get("Content-Type"))
     resp.raise_for_status()
 
-    text = resp.text.strip()
+    # Parse CSV
+    df = pd.read_csv(io.StringIO(resp.text))
 
-    # Most BMP metrics return CSV even if some examples mention JSON.
-    # Try CSV first, fall back to JSON if needed.
-    df = None
-    try:
-        df = pd.read_csv(io.StringIO(text))
-    except Exception:
-        try:
-            j = resp.json()
-            # If they ever return JSON, try to normalize it
-            df = pd.DataFrame(j)
-        except Exception as e:
-            raise RuntimeError("Could not parse response as CSV or JSON") from e
+    # Find columns (BMP sometimes varies naming slightly)
+    date_col = pick_col(df, ["Date", "date", "Time", "time", "Timestamp", "timestamp"])
+    price_col = pick_col(df, ["Price", "price"])
+    ma_col = pick_col(df, ["200WMA", "200wma", "MA200W", "ma200w", "200 Week Moving Average"])
 
-    # Normalize date column
-    date_col = None
-    for c in df.columns:
-        if str(c).lower() in ["date", "time", "timestamp"]:
-            date_col = c
-            break
-    if date_col is None:
-        # Some responses may have an unnamed first column used as index
-        if df.columns[0] == "" or str(df.columns[0]).startswith("Unnamed"):
-            date_col = df.columns[0]
-        else:
-            raise KeyError(f"Could not find a Date-like column. Columns: {list(df.columns)}")
+    out = df[[date_col, price_col, ma_col]].copy()
+    out.columns = ["date", "price", "ma200w"]
 
-    price_col = pick_col(df, ["Price", "price", "BTC Price", "btc_price"])
-    ma_col = pick_col(df, ["200WMA", "200wma", "200 Week Moving Average", "200_week_ma", "MA200W"])
+    # Normalize
+    out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    out = out.dropna(subset=["date"])
+    out = out.sort_values("date")
 
-    out_df = df[[date_col, price_col, ma_col]].copy()
-    out_df.columns = ["Date", "Price", "MA200W"]
+    out["price"] = pd.to_numeric(out["price"], errors="coerce")
+    out["ma200w"] = pd.to_numeric(out["ma200w"], errors="coerce")
+    out = out.dropna(subset=["price", "ma200w"])
 
-    # Clean and sort
-    out_df["Date"] = pd.to_datetime(out_df["Date"], errors="coerce", utc=True)
-    out_df = out_df.dropna(subset=["Date"])
-    out_df = out_df.sort_values("Date")
-
-    # Cast numeric
-    out_df["Price"] = pd.to_numeric(out_df["Price"], errors="coerce")
-    out_df["MA200W"] = pd.to_numeric(out_df["MA200W"], errors="coerce")
-
-    out_df = out_df.dropna(subset=["Price", "MA200W"])
-
-    payload = {
-        "meta": {
-            "source": "bitcoinmagazinepro",
-            "metric": METRIC,
-            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-            "rows": int(len(out_df)),
-        },
-        "data": [
-            {
-                "Date": d.strftime("%Y-%m-%d"),
-                "Price": float(p),
-                "MA200W": float(m),
-            }
-            for d, p, m in zip(out_df["Date"], out_df["Price"], out_df["MA200W"])
-        ],
-    }
+    # Convert to the exact JSON format your HTML expects
+    rows = [
+        {
+            "date": d.strftime("%Y-%m-%d"),
+            "price": float(p),
+            "ma200w": float(m),
+        }
+        for d, p, m in zip(out["date"], out["price"], out["ma200w"])
+    ]
 
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False)
+        json.dump(rows, f, ensure_ascii=False)
 
-    print(f"Wrote {OUT_PATH} with {payload['meta']['rows']} rows")
+    print(f"Wrote {OUT_PATH} rows={len(rows)}")
 
 
 if __name__ == "__main__":
