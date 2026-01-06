@@ -9,14 +9,53 @@
       const price = rows.map(d => d.price);
       const dma = rows.map(d => d.dma200);
 
-      Plotly.newPlot("chart", [
-        { x, y: price, name: "BTC Price", mode: "lines" },
-        { x, y: dma, name: "200 DMA", mode: "lines" }
-      ]);
+      const traces = [
+        {
+          x,
+          y: price,
+          name: "BTC Price",
+          mode: "lines",
+          line: { width: 2 }
+        },
+        {
+          x,
+          y: dma,
+          name: "200 Day MA",
+          mode: "lines",
+          line: { width: 2 }
+        }
+      ];
+
+      const layout = {
+        margin: { l: 70, r: 30, t: 30, b: 50 },
+        xaxis: {
+          showgrid: false
+        },
+        yaxis: {
+          type: "linear",
+          tickprefix: "$",
+          separatethousands: true,
+          showgrid: true,
+          gridcolor: "rgba(0,0,0,0.08)",
+          zeroline: false
+        },
+        legend: {
+          orientation: "h",
+          x: 0,
+          y: 1.05
+        }
+      };
+
+      Plotly.newPlot("chart", traces, layout, {
+        responsive: true,
+        displaylogo: false
+      });
+
     } catch (e) {
       document.getElementById("err").textContent = e.message;
       console.error(e);
     }
   }
+
   load();
 </script>
