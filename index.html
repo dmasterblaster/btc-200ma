@@ -49,8 +49,20 @@
         const dma = rows.map(d => d.dma200);
 
         const traces = [
-          { x, y: price, name: "BTC Price", mode: "lines", line: { width: 2 } },
-          { x, y: dma, name: "200 Day MA", mode: "lines", line: { width: 2 } }
+          {
+            x,
+            y: price,
+            name: "BTC Price",
+            mode: "lines",
+            line: { width: 2, color: "#000000" } // BLACK BTC PRICE
+          },
+          {
+            x,
+            y: dma,
+            name: "200 Day MA",
+            mode: "lines",
+            line: { width: 2 }
+          }
         ];
 
         const layout = {
