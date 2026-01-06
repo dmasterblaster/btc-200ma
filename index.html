@@ -44,9 +44,18 @@
           throw new Error("Data file loaded but is empty or not an array.");
         }
 
-        const x = rows.map(d => d.date);
-        const price = rows.map(d => d.price);
-        const dma = rows.map(d => d.dma200);
+        // ---- Trailing 3 years only ----
+        const cutoff = new Date();
+        cutoff.setFullYear(cutoff.getFullYear() - 3);
+
+        const filtered = rows.filter(r => {
+          const d = new Date(r.date);
+          return Number.isFinite(d.getTime()) && d >= cutoff;
+        });
+
+        const x = filtered.map(d => d.date);
+        const price = filtered.map(d => d.price);
+        const dma = filtered.map(d => d.dma200);
 
         const traces = [
           {
@@ -54,7 +63,7 @@
             y: price,
             name: "BTC Price",
             mode: "lines",
-            line: { width: 2, color: "#000000" } // BLACK BTC PRICE
+            line: { width: 2, color: "#000000" }
           },
           {
             x,
@@ -88,7 +97,6 @@
             y: 1.08
           },
 
-          /* 🔹 CENTER WATERMARK */
           images: [
             {
               source: "assets/tbl-logo.png",
@@ -105,7 +113,6 @@
             }
           ],
 
-          /* 🔹 BRAND LABEL */
           annotations: [
             {
               xref: "paper",
