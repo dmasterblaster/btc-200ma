@@ -6,82 +6,71 @@ import os
 import pandas as pd
 import requests
 
-
 METRIC = "200wma-heatmap"
 URL = f"https://api.bitcoinmagazinepro.com/metrics/{METRIC}"
 
-# Output that GitHub Pages will serve
-OUT_PATH = "docs/data/200dma.json"
+# ROOT data path (this is the key fix)
+OUT_PATH = "data/200dma.json"
 
 
-def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
-    cols_map = {str(c).strip().lower(): c for c in df.columns}
-    for cand in candidates:
-        key = cand.strip().lower()
-        if key in cols_map:
-            return cols_map[key]
-    raise KeyError(f"Missing column. Tried {candidates}. Found {list(df.columns)}")
+def pick_col(df: pd.DataFrame, candidates):
+    cols = {c.lower(): c for c in df.columns}
+    for c in candidates:
+        if c.lower() in cols:
+            return cols[c.lower()]
+    raise ValueError(f"Missing column, found: {df.columns}")
 
 
-def coerce_to_csv_text(raw: str) -> str:
+def coerce_csv(raw: str) -> str:
     s = raw.strip()
-
-    # Sometimes the API returns a JSON-encoded string containing CSV
-    if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
-        try:
-            s = json.loads(s)
-        except Exception:
-            s = s[1:-1]
-
-    # Sometimes CSV starts with a leading comma
-    s = s.lstrip()
+    if s.startswith('"') and s.endswith('"'):
+        s = json.loads(s)
     if s.startswith(","):
         s = s[1:]
-    if s.startswith('",'):
-        s = s[2:]
-
     return s
 
 
-def main() -> None:
-    api_key = os.environ.get("BMP_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing BMP_API_KEY env var")
+def main():
+    api_key = os.environ["BMP_API_KEY"]
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "*/*",
-        "User-Agent": "Mozilla/5.0 (compatible; btc-200ma/1.0)",
-    }
-
-    resp = requests.get(URL, headers=headers, timeout=45)
-    print("BMP API status code:", resp.status_code)
-    print("Content-Type:", resp.headers.get("Content-Type"))
-    preview = resp.text[:160].replace("\n", "\\n")
-    print("First 160 chars:", preview)
+    resp = requests.get(
+        URL,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "*/*",
+        },
+        timeout=30,
+    )
     resp.raise_for_status()
 
-    csv_text = coerce_to_csv_text(resp.text)
+    csv_text = coerce_csv(resp.text)
     df = pd.read_csv(io.StringIO(csv_text))
 
-    date_col = pick_col(df, ["Date", "date", "Time", "time", "Timestamp", "timestamp"])
-    price_col = pick_col(df, ["Price", "price"])
+    date_col = pick_col(df, ["date", "time", "timestamp"])
+    price_col = pick_col(df, ["price"])
 
-    out = df[[date_col, price_col]].copy()
-    out.columns = ["date", "price"]
+    df = df[[date_col, price_col]].rename(
+        columns={date_col: "date", price_col: "price"}
+    )
 
-    out["date"] = pd.to_datetime(out["date"], errors="coerce")
-    out["price"] = pd.to_numeric(out["price"], errors="coerce")
-    out = out.dropna(subset=["date", "price"]).sort_values("date")
+    df["date"] = pd.to_datetime(df["date"])
+    df["price"] = pd.to_numeric(df["price"])
+    df = df.sort_values("date")
 
-    # Compute 200-day moving average from daily price
-    out["dma200"] = out["price"].rolling(window=200, min_periods=200).mean()
-    out = out.dropna(subset=["dma200"])
+    df["dma200"] = df["price"].rolling(200).mean()
+    df = df.dropna()
 
     rows = [
         {"date": d.strftime("%Y-%m-%d"), "price": float(p), "dma200": float(m)}
-        for d, p, m in zip(out["date"], out["price"], out["dma200"])
+        for d, p, m in zip(df["date"], df["price"], df["dma200"])
     ]
 
-    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-    with ope
+    os.makedirs("data", exist_ok=True)
+    with open(OUT_PATH, "w") as f:
+        json.dump(rows, f)
+
+    print(f"Wrote {OUT_PATH} ({len(rows)} rows)")
+
+
+if __name__ == "__main__":
+    main()
