@@ -1,61 +1,81 @@
-<script>
-  async function load() {
-    try {
-      const r = await fetch("data/200dma.json", { cache: "no-store" });
-      if (!r.ok) throw new Error(`404: ${r.url}`);
-      const rows = await r.json();
-
-      const x = rows.map(d => d.date);
-      const price = rows.map(d => d.price);
-      const dma = rows.map(d => d.dma200);
-
-      const traces = [
-        {
-          x,
-          y: price,
-          name: "BTC Price",
-          mode: "lines",
-          line: { width: 2 }
-        },
-        {
-          x,
-          y: dma,
-          name: "200 Day MA",
-          mode: "lines",
-          line: { width: 2 }
-        }
-      ];
-
-      const layout = {
-        margin: { l: 70, r: 30, t: 30, b: 50 },
-        xaxis: {
-          showgrid: false
-        },
-        yaxis: {
-          type: "linear",
-          tickprefix: "$",
-          separatethousands: true,
-          showgrid: true,
-          gridcolor: "rgba(0,0,0,0.08)",
-          zeroline: false
-        },
-        legend: {
-          orientation: "h",
-          x: 0,
-          y: 1.05
-        }
-      };
-
-      Plotly.newPlot("chart", traces, layout, {
-        responsive: true,
-        displaylogo: false
-      });
-
-    } catch (e) {
-      document.getElementById("err").textContent = e.message;
-      console.error(e);
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BTC 200 Day Moving Average</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #chart { width: 100%; height: 100vh; }
+    #err {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      color: #c00;
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      white-space: pre-wrap;
+      max-width: 95vw;
+      background: rgba(255,255,255,0.9);
+      padding: 8px 10px;
+      border-radius: 8px;
     }
-  }
+  </style>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+  <div id="chart"></div>
+  <div id="err"></div>
 
-  load();
-</script>
+  <script>
+    async function load() {
+      const errEl = document.getElementById("err");
+      try {
+        errEl.textContent = "";
+
+        const url = "data/200dma.json";
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error(`Fetch failed: ${r.status}\nURL: ${r.url}`);
+
+        const rows = await r.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          throw new Error("Data file loaded but is empty or not an array.");
+        }
+
+        const x = rows.map(d => d.date);
+        const price = rows.map(d => d.price);
+        const dma = rows.map(d => d.dma200);
+
+        const traces = [
+          { x, y: price, name: "BTC Price", mode: "lines", line: { width: 2 } },
+          { x, y: dma, name: "200 Day MA", mode: "lines", line: { width: 2 } }
+        ];
+
+        const layout = {
+          margin: { l: 70, r: 30, t: 30, b: 50 },
+          xaxis: { showgrid: false },
+          yaxis: {
+            type: "linear",
+            tickprefix: "$",
+            separatethousands: true,
+            showgrid: true,
+            gridcolor: "rgba(0,0,0,0.08)",
+            zeroline: false
+          },
+          legend: { orientation: "h", x: 0, y: 1.05 }
+        };
+
+        Plotly.newPlot("chart", traces, layout, {
+          responsive: true,
+          displaylogo: false
+        });
+
+      } catch (e) {
+        errEl.textContent = String(e && e.message ? e.message : e);
+        console.error(e);
+      }
+    }
+
+    window.addEventListener("load", load);
+  </script>
+</body>
+</html>
