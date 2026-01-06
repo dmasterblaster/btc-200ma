@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BTC 200 Day Moving Average</title>
+
   <style>
     html, body { height: 100%; margin: 0; }
     #chart { width: 100%; height: 100vh; }
@@ -18,8 +19,10 @@
       background: rgba(255,255,255,0.9);
       padding: 8px 10px;
       border-radius: 8px;
+      z-index: 9999;
     }
   </style>
+
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
 </head>
 <body>
@@ -51,8 +54,13 @@
         ];
 
         const layout = {
-          margin: { l: 70, r: 30, t: 30, b: 50 },
-          xaxis: { showgrid: false },
+          margin: { l: 70, r: 30, t: 40, b: 50 },
+
+          xaxis: {
+            type: "date",
+            showgrid: false
+          },
+
           yaxis: {
             type: "linear",
             tickprefix: "$",
@@ -61,7 +69,48 @@
             gridcolor: "rgba(0,0,0,0.08)",
             zeroline: false
           },
-          legend: { orientation: "h", x: 0, y: 1.05 }
+
+          legend: {
+            orientation: "h",
+            x: 0,
+            y: 1.08
+          },
+
+          /* 🔹 CENTER WATERMARK */
+          images: [
+            {
+              source: "assets/tbl-logo.png",
+              xref: "paper",
+              yref: "paper",
+              x: 0.5,
+              y: 0.5,
+              sizex: 0.6,
+              sizey: 0.6,
+              xanchor: "center",
+              yanchor: "middle",
+              opacity: 0.06,
+              layer: "below"
+            }
+          ],
+
+          /* 🔹 BRAND LABEL */
+          annotations: [
+            {
+              xref: "paper",
+              yref: "paper",
+              x: 0.02,
+              y: 0.98,
+              xanchor: "left",
+              yanchor: "top",
+              text: "Charts by: @TheBitcoinLayer",
+              showarrow: false,
+              font: { size: 14, color: "#111" },
+              bgcolor: "rgba(255,255,255,0.7)",
+              bordercolor: "rgba(0,0,0,0.15)",
+              borderwidth: 1,
+              borderpad: 6
+            }
+          ]
         };
 
         Plotly.newPlot("chart", traces, layout, {
